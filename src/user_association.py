@@ -33,5 +33,6 @@ def uncertainty_aware_offloading(es: EdgeServer, tau: float) -> Dict[int, int]:
             decisions[u_min.id] = 1
             offloaded.append(u_min)
             remaining.remove(u_min)
+            es.B_i = B_i
 
     return decisions

@@ -1,5 +1,7 @@
 import math
-from typing import List
+from typing import List, Dict
+
+from config import BANDWIDTH, TRANSMIT_POWER, NOISE_POWER
 
 
 class User:
@@ -10,10 +12,10 @@ class User:
         h: complex,
         P: float,
         sigma2: float,
+        input: any,
+        label: any,
         W_i_SLM: float,
         W_i_LLM: float,
-        input_q: any,  # query type
-        model: any,
         C_i_L: float,
         p_k: List[float],
     ):
@@ -22,12 +24,18 @@ class User:
         self.h = h
         self.P = P
         self.sigma2 = sigma2
+        self.input = input
+        self.label = label
         self.W_i_SLM = W_i_SLM
         self.W_i_LLM = W_i_LLM
-        self.input_q = input_q
-        self.model = model
         self.C_i_L = C_i_L
         self.p_k = p_k
+
+        self.t_comm = None
+        self.t_comp = None
+        self.t_total = None
+        self.prediction = None
+        self.is_correct = None
 
         self.uncertainty = 1.0 - (self.p_k[0] - self.p_k[1])
 
@@ -47,6 +55,8 @@ class EdgeServer:
         self.B = B
         self.C_ES = C_ES
         self.C_max = C_max
+
+        self.B_i = None
         self.users: List[User] = []
 
     def add_user(self, user: User):
@@ -61,3 +71,7 @@ class EdgeServer:
 
     def edge_comp_delay(self, u: User, C_i_ES: float) -> float:
         return u.W_i_LLM / C_i_ES
+
+    def total_comm_delay(self, decisions: Dict[int, int], u: User) -> float:
+        R_i = self.B_i * math.log2(1 + u.P * abs(u.h) / u.sigma2)
+        return u.D / R_i
