@@ -36,11 +36,11 @@ def measure_inference_delay(model, input: str, max_length: int = 100) -> float:
 
     inputs = model.tokenizer(input, return_tensors="pt", truncation=True).to(device)
 
-    _ = model.model.generate(**inputs, max_length=max_length)
+    _ = model.generate(**inputs)
 
     torch.cuda.synchronize()
     start = time.time()
-    _ = model.model.generate(**inputs, max_length=max_length)
+    _ = model.generate(**inputs)
     torch.cuda.synchronize()
     end = time.time()
 

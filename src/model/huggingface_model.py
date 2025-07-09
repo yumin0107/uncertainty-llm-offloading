@@ -16,8 +16,9 @@ class HuggingfaceModel(BaseModel):
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         out = self.model.generate(
             **inputs,
-            max_new_tokens=4,
+            max_new_tokens=5,
             do_sample=False,
+            pad_token_id=self.tokenizer.eos_token_id
         )
         return self.tokenizer.decode(out[0], skip_special_tokens=True)
 

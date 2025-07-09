@@ -12,5 +12,5 @@ MAX_COMPUTE_PER_USER = 10e9  # C_max (10 GHz)
 
 # Model
 SLM = "meta-llama/Llama-3.2-1B"
-LLM = "meta-llama/Llama-3.2-3B"
+LLM = "meta-llama/Llama-3.2-3B-Instruct"
 K = 10
