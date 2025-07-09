@@ -11,6 +11,6 @@ EDGE_COMPUTE_CAP = 100e9  # C_ES (100 GHz)
 MAX_COMPUTE_PER_USER = 10e9  # C_max (10 GHz)
 
 # Model
-SLM = "TinyLlama/TinyLlama_v1.1"
-LLM = "meta-llama/Llama-2-7b"
+SLM = "meta-llama/Llama-3.2-1B"
+LLM = "meta-llama/Llama-3.2-3B"
 K = 10
