@@ -19,10 +19,10 @@ from datasets import load_dataset
 from basestation import User, EdgeServer
 from user_association import uncertainty_aware_offloading
 from utils import (
-    estimate_worklad,
-    measure_inference_delay,
+    estimate_workload,
     generate_rayleigh_coeffs,
     bit_size_text,
+    is_correct,
 )
 from config import (
     BANDWIDTH,
@@ -60,9 +60,16 @@ def generate_users(
     h_list = generate_rayleigh_coeffs(N)
 
     users = []
-    for i, sample in enumerate(ds):
-        text = sample["text"]
-        label = sample["label"]
+    for i in range(N):
+        passage = ds[i]["passage"]
+        question = ds[i]["question"]
+        answer = ds[i]["answer"]
+        text = (
+            f"Instruction: Answer with only one word. No explanation."
+            f"Context: {passage.strip()}\n"
+            f"Question: {question.strip()}\n"
+            f"Answer(only one word):"
+        )
 
         tokens = model.tokenizer.encode(text, truncation=True)
         D_i = bit_size_text(text)
@@ -70,8 +77,8 @@ def generate_users(
         topk = model.topk_probs(text, k=K)
         p_topk = [prob for _, prob in topk]
 
-        W_i_SLM = estimate_worklad(len(tokens), SLM)
-        W_i_LLM = estimate_worklad(len(tokens), LLM)
+        W_i_SLM = estimate_workload(len(tokens), SLM)
+        W_i_LLM = estimate_workload(len(tokens), LLM)
 
         users.append(
             User(
@@ -81,7 +88,7 @@ def generate_users(
                 P=P,
                 sigma2=sigma2,
                 input=text,
-                label=label,
+                label=answer,
                 W_i_SLM=W_i_SLM,
                 W_i_LLM=W_i_LLM,
                 C_i_L=C_L,
@@ -108,15 +115,19 @@ if __name__ == "__main__":
     edge_model = get_model(LLM)
     ##############################################
     ################# 경로 수정 필요 ###############
-    dataset = load_dataset("google-research-datasets/natural_questions", split="train")
+    dataset = load_dataset("Muennighoff/babi", split="train")
     ##############################################
     ##############################################
 
-    n_run = 50
+    n_run = 10
     b_seed = 42
-    correct_count = 0
+    correct_count_SLM = 0
+    correct_count_LLM = 0
+    correct_count_offloading = 0
+    total_delay_SLM = 0
+    total_delay_offloading = 0
+    total_delay_LLM = 0
     total_count = 0
-    total_delay = 0
 
     for i in range(n_run):
         seed = b_seed + i
@@ -139,24 +150,41 @@ if __name__ == "__main__":
 
         # delay & accuracy
         for u in users:
+            pred_SLM, inf_delay_SLM = user_model.generate(u.input)
+            pred_LLM, inf_delay_LLM = edge_model.generate(u.input)
             if decisions[u.id] == 1:
-                u.t_comp = measure_inference_delay(edge_model, u.input, max_length=100)
+                u.t_comp = inf_delay_LLM
+                print(decisions)
                 u.t_comm = es.total_comm_delay(decisions, u)
-                u.prediction = edge_model.generate(u.input)
+                u.prediction = pred_LLM
             else:
-                u.t_comp = measure_inference_delay(user_model, u.input, max_length=100)
+                u.t_comp = inf_delay_SLM
                 u.t_comm = 0
-                u.prediction = user_model.generate(u.input)
+                u.prediction = pred_SLM
 
-            u.t_total = u.t_comp + u.t_comm
-            total_delay += u.t_total
+            total_delay_SLM += inf_delay_SLM
+            total_delay_offloading += u.t_comp + u.t_comm
+            total_delay_LLM += inf_delay_LLM
 
-            u.is_correct = int(u.prediction.strip() == u.label.strip())
-            correct_count += u.is_correct
+            correct_count_SLM += is_correct(pred_SLM, u.label)
+            correct_count_offloading += is_correct(u.prediction, u.label)
+            correct_count_LLM += is_correct(pred_LLM, u.label)
             total_count += 1
 
-    accuracy = correct_count / total_count * 100
-    delay = total_delay / (main_args.N * n_run)
+    accuracy_SLM = correct_count_SLM / total_count * 100
+    accuracy_offloading = correct_count_offloading / total_count * 100
+    accuracy_LLM = correct_count_LLM / total_count * 100
 
-    print(f"\n=== Final Accuracy over {total_count} samples: {accuracy:.2f}% ===\n")
-    print(f"\n=== Final Delay: {delay*1000:.3f} ms ===\n")
+    delay_SLM = total_delay_SLM / (main_args.N * n_run)
+    delay_offloading = total_delay_offloading / (main_args.N * n_run)
+    inf_delay_LLM = total_delay_LLM / (main_args.N * n_run)
+
+print("\n=== Accuracy Metrics ===")
+print(f"SLM Accuracy        : {accuracy_SLM:.2f}%")
+print(f"Offloading Accuracy : {accuracy_offloading:.2f}%")
+print(f"LLM Accuracy        : {accuracy_LLM:.2f}%")
+
+print("\n=== Inference Delay (per sample) ===")
+print(f"SLM Delay           : {delay_SLM*1000:.3f} ms")
+print(f"Offloading Delay    : {delay_offloading*1000:.3f} ms")
+print(f"LLM Delay           : {inf_delay_LLM*1000:.3f} ms")

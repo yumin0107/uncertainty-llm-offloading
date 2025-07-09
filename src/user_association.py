@@ -4,13 +4,17 @@ from basestation import User, EdgeServer
 
 def uncertainty_aware_offloading(es: EdgeServer, tau: float) -> Dict[int, int]:
     decisions: Dict[int, int] = {u.id: 0 for u in es.users}
+    offloaded = []
+    remaining = []
 
     for u in es.users:
-        if u.uncertainty() > tau:
+        if u.uncertainty > tau:
             decisions[u.id] = 1
+            offloaded.append(u)
+        else:
+            remaining.append(u)
 
-    offloaded: List[User] = [u for u in es.users if decisions[u.id] == 1]
-    remaining: List[User] = [u for u in es.users if decisions[u.id] == 0]
+    es.B_i = es.bandwidth_allocation(len(offloaded))
 
     while remaining:
         B_i = es.bandwidth_allocation(len(offloaded) + 1)
