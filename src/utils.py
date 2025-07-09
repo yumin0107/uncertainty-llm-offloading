@@ -30,9 +30,9 @@ def estimate_workload(input_length: int, model_name: str) -> float:
     return total_flops
 
 
-def generate_rayleigh_coeffs(N: int) -> np.ndarray:
+def generate_rayleigh_coeffs(M: int) -> np.ndarray:
     rayleigh = RayleighBlockFading(num_rx=1, num_tx=1, num_rx_ant=1, num_tx_ant=1)
-    h, _ = rayleigh(batch_size=N, num_time_steps=1)
+    h, _ = rayleigh(batch_size=M, num_time_steps=1)
     h = tf.squeeze(h, axis=[1, 2, 3, 4, 5])
     return h.numpy()
 

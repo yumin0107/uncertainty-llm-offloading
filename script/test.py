@@ -41,8 +41,16 @@ from model.huggingface_model import HuggingfaceModel
 from model import get_model
 
 
+def generate_es(M: int) -> list[EdgeServer]:
+    return [
+        EdgeServer(i, BANDWIDTH, EDGE_COMPUTE_CAP, MAX_COMPUTE_PER_USER)
+        for i in range(M)
+    ]
+
+
 def generate_users(
     N: int,
+    M: int,
     model: HuggingfaceModel,
     dataset,
     seed: int,
@@ -57,7 +65,6 @@ def generate_users(
     torch.manual_seed(seed)
 
     ds = dataset.shuffle().select(range(N))
-    h_list = generate_rayleigh_coeffs(N)
 
     users = []
     for i in range(N):
@@ -80,11 +87,13 @@ def generate_users(
         W_i_SLM = estimate_workload(len(tokens), SLM)
         W_i_LLM = estimate_workload(len(tokens), LLM)
 
+        h_list = generate_rayleigh_coeffs(M)
+
         users.append(
             User(
-                id=i + 1,
+                id=i,
                 D=D_i,
-                h=h_list[i],
+                h=h_list,
                 P=P,
                 sigma2=sigma2,
                 input=text,
@@ -101,6 +110,7 @@ def generate_users(
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--N", type=int, default=10)
+    parser.add_argument("--M", type=int, default=3)
     parser.add_argument("--tau", type=float, default=0.5)
 
     return parser
@@ -132,8 +142,10 @@ if __name__ == "__main__":
     for i in range(n_run):
         seed = b_seed + i
         # initailize user & edge server
+        es = generate_es(main_args.M)
         users = generate_users(
             main_args.N,
+            main_args.M,
             user_model,
             dataset,
             seed,
@@ -141,35 +153,32 @@ if __name__ == "__main__":
             NOISE_POWER,
             LOCAL_COMPUTE_CAP,
         )
-        es = EdgeServer(BANDWIDTH, EDGE_COMPUTE_CAP, MAX_COMPUTE_PER_USER)
-        for u in users:
-            es.add_user(u)
 
         # ua
-        decisions = uncertainty_aware_offloading(es, main_args.tau)
+        decisions = uncertainty_aware_offloading(users, es, main_args.tau)
 
         # delay & accuracy
-        for u in users:
-            pred_SLM, inf_delay_SLM = user_model.generate(u.input)
-            pred_LLM, inf_delay_LLM = edge_model.generate(u.input)
-            if decisions[u.id] == 1:
-                u.t_comp = inf_delay_LLM
-                print(decisions)
-                u.t_comm = es.total_comm_delay(decisions, u)
-                u.prediction = pred_LLM
-            else:
-                u.t_comp = inf_delay_SLM
-                u.t_comm = 0
-                u.prediction = pred_SLM
+        for e in es:
+            for u in e.users:
+                pred_SLM, inf_delay_SLM = user_model.generate(u.input)
+                pred_LLM, inf_delay_LLM = edge_model.generate(u.input)
+                if decisions[u.id] == 1:
+                    u.t_comp = inf_delay_LLM
+                    u.t_comm = e.total_comm_delay(u)
+                    u.prediction = pred_LLM
+                else:
+                    u.t_comp = inf_delay_SLM
+                    u.t_comm = 0
+                    u.prediction = pred_SLM
 
-            total_delay_SLM += inf_delay_SLM
-            total_delay_offloading += u.t_comp + u.t_comm
-            total_delay_LLM += inf_delay_LLM
+                total_delay_SLM += inf_delay_SLM
+                total_delay_offloading += u.t_comp + u.t_comm
+                total_delay_LLM += inf_delay_LLM
 
-            correct_count_SLM += is_correct(pred_SLM, u.label)
-            correct_count_offloading += is_correct(u.prediction, u.label)
-            correct_count_LLM += is_correct(pred_LLM, u.label)
-            total_count += 1
+                correct_count_SLM += is_correct(pred_SLM, u.label)
+                correct_count_offloading += is_correct(u.prediction, u.label)
+                correct_count_LLM += is_correct(pred_LLM, u.label)
+                total_count += 1
 
     accuracy_SLM = correct_count_SLM / total_count * 100
     accuracy_offloading = correct_count_offloading / total_count * 100
