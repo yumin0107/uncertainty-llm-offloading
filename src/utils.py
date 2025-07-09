@@ -4,7 +4,7 @@ from transformers import AutoConfig
 import numpy as np
 import torch
 import tensorflow as tf
-from sionna.phy.channel import RayleighBlockFading
+from sionna.channel import RayleighBlockFading
 
 
 def estimate_workload(input_length: int, model_name: str) -> float:

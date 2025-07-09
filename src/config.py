@@ -13,3 +13,4 @@ MAX_COMPUTE_PER_USER = 10e9  # C_max (10 GHz)
 # Model
 SLM = "TinyLlama/TinyLlama_v1.1"
 LLM = "meta-llama/Llama-2-7b"
+K = 10
