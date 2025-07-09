@@ -13,6 +13,7 @@ if SRC_DIR not in sys.path:
 import numpy as np
 import torch
 import tensorflow as tf
+from datasets import load_dataset
 
 # Communication
 from basestation import User, EdgeServer
@@ -32,12 +33,12 @@ from config import (
     MAX_COMPUTE_PER_USER,
     SLM,
     LLM,
+    K,
 )
 
 # LLM
 from model.huggingface_model import HuggingfaceModel
 from model import get_model
-from dataset.loader import load_dataset
 
 
 def generate_users(
@@ -66,7 +67,7 @@ def generate_users(
         tokens = model.tokenizer.encode(text, truncation=True)
         D_i = bit_size_text(text)
 
-        topk = model.topk_probs(text, k=10)
+        topk = model.topk_probs(text, k=K)
         p_topk = [prob for _, prob in topk]
 
         W_i_SLM = estimate_worklad(len(tokens), SLM)
@@ -107,7 +108,7 @@ if __name__ == "__main__":
     edge_model = get_model(LLM)
     ##############################################
     ################# 경로 수정 필요 ###############
-    dataset = load_dataset(os.path.join(SRC_DIR, "dataset"))
+    dataset = load_dataset("google-research-datasets/natural_questions", split="train")
     ##############################################
     ##############################################
 

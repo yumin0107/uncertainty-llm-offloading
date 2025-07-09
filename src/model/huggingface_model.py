@@ -2,21 +2,27 @@ from .base import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from typing import List, Tuple
+import sys
 
 
 class HuggingfaceModel(BaseModel):
     def __init__(self, model_name: str):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         self.model.eval()
 
     def generate(self, prompt: str) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        out = self.model.generate(**inputs, max_length=100)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        out = self.model.generate(
+            **inputs,
+            max_new_tokens=50,
+            do_sample=False,
+        )
         return self.tokenizer.decode(out[0], skip_special_tokens=True)
 
     def topk_probs(self, prompt: str, k: int) -> List[Tuple[str, float]]:
-        inputs = self.tokenizer(prompt, return_tensors="pt")
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         with torch.no_grad():
             logits = self.model(**inputs).logits  # (1, L, V)
         next_logits = logits[0, -1]  # (V,)
