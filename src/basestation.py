@@ -1,5 +1,5 @@
 import math
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from config import BANDWIDTH, TRANSMIT_POWER, NOISE_POWER
 
@@ -9,7 +9,7 @@ class User:
         self,
         id: int,
         D: float,
-        h: complex,
+        h: List[complex],
         P: float,
         sigma2: float,
         input: any,
@@ -31,30 +31,28 @@ class User:
         self.C_i_L = C_i_L
         self.p_k = p_k
 
-        self.t_comm = None
-        self.t_comp = None
-        self.prediction = None
+        self.t_comm: Optional[float] = None
+        self.t_comp: Optional[float] = None
+        self.prediction: Optional[str] = None
 
         self.uncertainty = 1.0 - (self.p_k[0] - self.p_k[1])
 
-    def comm_rate(self, B_i: float) -> float:
-        return B_i * math.log2(1 + self.P * abs(self.h) / self.sigma2)
-
-    def comm_delay(self, B_i: float) -> float:
-        R = self.comm_rate(B_i)
-        return self.D / R if R > 0 else float("inf")
+    def comm_delay(self, B_j: float, j: int) -> float:
+        R_ij = B_j * math.log2(1 + self.P * abs(self.h[j]) / self.sigma2)
+        return self.D / R_ij if R_ij > 0 else float("inf")
 
     def local_comp_delay(self) -> float:
         return self.W_i_SLM / self.C_i_L
 
 
 class EdgeServer:
-    def __init__(self, B: float, C_ES: float, C_max: float):
+    def __init__(self, id, B: float, C_ES: float, C_max: float):
+        self.id = id
         self.B = B
         self.C_ES = C_ES
         self.C_max = C_max
 
-        self.B_i = B
+        self.B_j = B
         self.users: List[User] = []
 
     def add_user(self, user: User):
@@ -67,9 +65,9 @@ class EdgeServer:
     def compute_allocation(self, n_offloaded: int) -> float:
         return max(self.C_max, self.C_ES / n_offloaded)
 
-    def edge_comp_delay(self, u: User, C_i_ES: float) -> float:
-        return u.W_i_LLM / C_i_ES
+    def edge_comp_delay(self, u: User, C_j_ES: float) -> float:
+        return u.W_i_LLM / C_j_ES
 
-    def total_comm_delay(self, decisions: Dict[int, int], u: User) -> float:
-        R_i = self.B_i * math.log2(1 + u.P * abs(u.h) / u.sigma2)
-        return u.D / R_i
+    def total_comm_delay(self, u: User) -> float:
+        R_ij = self.B_j * math.log2(1 + u.P * abs(u.h[self.id]) / u.sigma2)
+        return u.D / R_ij
