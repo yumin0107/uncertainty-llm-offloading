@@ -33,9 +33,7 @@ class User:
 
         self.t_comm = None
         self.t_comp = None
-        self.t_total = None
         self.prediction = None
-        self.is_correct = None
 
         self.uncertainty = 1.0 - (self.p_k[0] - self.p_k[1])
 
@@ -56,7 +54,7 @@ class EdgeServer:
         self.C_ES = C_ES
         self.C_max = C_max
 
-        self.B_i = None
+        self.B_i = B
         self.users: List[User] = []
 
     def add_user(self, user: User):

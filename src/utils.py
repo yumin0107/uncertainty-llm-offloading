@@ -1,4 +1,5 @@
 import time
+import re
 
 from transformers import AutoConfig
 import numpy as np
@@ -29,31 +30,18 @@ def estimate_workload(input_length: int, model_name: str) -> float:
     return total_flops
 
 
-def measure_inference_delay(model, input: str, max_length: int = 100) -> float:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.model.to(device)
-    model.tokenizer.model_max_length = max_length
-
-    inputs = model.tokenizer(input, return_tensors="pt", truncation=True).to(device)
-
-    _ = model.generate(**inputs)
-
-    torch.cuda.synchronize()
-    start = time.time()
-    _ = model.generate(**inputs)
-    torch.cuda.synchronize()
-    end = time.time()
-
-    return end - start
-
-
 def generate_rayleigh_coeffs(N: int) -> np.ndarray:
-    rayleigh = RayleighBlockFading(num_rx=1, num_tx=1, dtype=tf.complex64)
-    x = tf.ones((N, 1, 1, 1), dtype=tf.complex64)
-    h = rayleigh(x, training=False)
-    h = tf.squeeze(h, axis=[1, 2, 3])
+    rayleigh = RayleighBlockFading(num_rx=1, num_tx=1, num_rx_ant=1, num_tx_ant=1)
+    h, _ = rayleigh(batch_size=N, num_time_steps=1)
+    h = tf.squeeze(h, axis=[1, 2, 3, 4, 5])
     return h.numpy()
 
 
 def bit_size_text(text) -> int:
     return len(text.encode("utf-8"))
+
+
+def is_correct(prediction: str, answer: str) -> bool:
+    prediction = prediction.strip().lower()
+    answer = answer.strip().lower()
+    return re.search(rf"\b{re.escape(answer)}\b", prediction) is not None

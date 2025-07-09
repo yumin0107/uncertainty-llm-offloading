@@ -3,6 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from typing import List, Tuple
 import sys
+import time
 
 
 class HuggingfaceModel(BaseModel):
@@ -12,15 +13,23 @@ class HuggingfaceModel(BaseModel):
         self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         self.model.eval()
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompt: str) -> Tuple[str, float]:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+
         out = self.model.generate(
             **inputs,
             max_new_tokens=5,
             do_sample=False,
             pad_token_id=self.tokenizer.eos_token_id
         )
-        return self.tokenizer.decode(out[0], skip_special_tokens=True)
+
+        torch.cuda.synchronize()
+        start = time.time()
+        _ = self.model.generate(**inputs)
+        torch.cuda.synchronize()
+        end = time.time()
+
+        return self.tokenizer.decode(out[0], skip_special_tokens=True), end - start
 
     def topk_probs(self, prompt: str, k: int) -> List[Tuple[str, float]]:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
