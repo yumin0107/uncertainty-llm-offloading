@@ -19,10 +19,9 @@ def uncertainty_aware_offloading(
         delta_p: Dict[EdgeServer, float] = {}
         for e in es:
             B_j = e.bandwidth_allocation(len(e.users) + 1)
-            C_j_ES = e.compute_allocation(len(e.users) + 1)
 
             t_j_comm = u_p.comm_delay(B_j, e.id)
-            t_j_comp_ES = e.edge_comp_delay(u_p, C_j_ES)
+            t_j_comp_ES = e.edge_comp_delay(u_p)
             t_j_comp_L = u_p.local_comp_delay()
 
             delta_p[e] = t_j_comm + t_j_comp_ES - t_j_comp_L
@@ -40,10 +39,9 @@ def uncertainty_aware_offloading(
         u = id_to_user[uid]
         for e in es:
             B_j = e.bandwidth_allocation(len(e.users) + 1)
-            C_j_ES = e.compute_allocation(len(e.users) + 1)
 
             t_j_comm = u.comm_delay(B_j, e.id)
-            t_j_comp_ES = e.edge_comp_delay(u, C_j_ES)
+            t_j_comp_ES = e.edge_comp_delay(u)
             t_j_comp_L = u.local_comp_delay()
 
             delta[(uid, e.id)] = t_j_comm + t_j_comp_ES - t_j_comp_L
@@ -70,10 +68,9 @@ def uncertainty_aware_offloading(
             u = id_to_user[uid]
             for e in es:
                 B_j = e.bandwidth_allocation(len(e.users) + 1)
-                C_j_ES = e.compute_allocation(len(e.users) + 1)
 
                 t_j_comm = u.comm_delay(B_j, e.id)
-                t_j_comp_ES = e.edge_comp_delay(u, C_j_ES)
+                t_j_comp_ES = e.edge_comp_delay(u)
                 t_j_comp_L = u.local_comp_delay()
 
                 delta[(uid, e.id)] = t_j_comm + t_j_comp_ES - t_j_comp_L

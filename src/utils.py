@@ -1,5 +1,6 @@
 import time
 import re
+from typing import Dict
 
 from transformers import AutoConfig
 import numpy as np
@@ -24,11 +25,12 @@ def estimate_workload(input_length: int, model_name: str) -> float:
 
     # Compute FLOPs per layer
     flops_attn = 4 * input_length * (d_model**2)
-    flops_ffn = 8 * d_model * d_ff
+    flops_ffn = 4 * input_length * d_model * d_ff
     flops_per_layer = flops_attn + flops_ffn
 
+    flops_attn_extra = 2 * input_length * d_model**2 * n_layers
     # Total FLOPs for all layers
-    total_flops = flops_per_layer * n_layers
+    total_flops = flops_per_layer * (n_layers + 1) + flops_attn_extra
 
     return total_flops
 
@@ -55,3 +57,7 @@ def is_correct(prediction: str, answer: str) -> bool:
     prediction = prediction.strip().lower()
     answer = answer.strip().lower()
     return re.search(rf"\b{re.escape(answer)}\b", prediction) is not None
+
+
+def is_offloading(u_id: int, decisions: Dict[int, Dict[int, int]]) -> bool:
+    return any(value == 1 for value in decisions[u_id].values())
