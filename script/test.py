@@ -25,6 +25,9 @@ from utils import (
     is_correct,
 )
 from config import (
+    M,
+    D,
+    FIXED_ES,
     BANDWIDTH,
     TRANSMIT_POWER,
     NOISE_POWER,
@@ -42,8 +45,9 @@ from model import get_model
 
 
 def generate_es(M: int) -> list[EdgeServer]:
+    es_pos = tf.constant(FIXED_ES, dtype=tf.float32)
     return [
-        EdgeServer(i, BANDWIDTH, EDGE_COMPUTE_CAP, MAX_COMPUTE_PER_USER)
+        EdgeServer(i, es_pos[i], BANDWIDTH, EDGE_COMPUTE_CAP, MAX_COMPUTE_PER_USER)
         for i in range(M)
     ]
 
@@ -66,6 +70,10 @@ def generate_users(
 
     ds = dataset.shuffle().select(range(N))
 
+    u_pos = tf.constant(np.random.uniform(0, D, (N, 2)), dtype=tf.float32)  # N x 2
+    es_pos = tf.constant(FIXED_ES, dtype=tf.float32)  # M x 2
+    d = tf.norm(u_pos[:, None, :] - es_pos[None, :, :], axis=-1)  # N x M
+
     users = []
     for i in range(N):
         passage = ds[i]["passage"]
@@ -87,7 +95,7 @@ def generate_users(
         W_i_SLM = estimate_workload(len(tokens), SLM)
         W_i_LLM = estimate_workload(len(tokens), LLM)
 
-        h_list = generate_rayleigh_coeffs(M)
+        h_list = generate_rayleigh_coeffs(M, d[i])
 
         users.append(
             User(
@@ -110,7 +118,6 @@ def generate_users(
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--N", type=int, default=10)
-    parser.add_argument("--M", type=int, default=3)
     parser.add_argument("--tau", type=float, default=0.5)
 
     return parser
@@ -129,7 +136,7 @@ if __name__ == "__main__":
     ##############################################
     ##############################################
 
-    n_run = 10
+    n_run = 20
     b_seed = 42
     correct_count_SLM = 0
     correct_count_LLM = 0
@@ -142,10 +149,10 @@ if __name__ == "__main__":
     for i in range(n_run):
         seed = b_seed + i
         # initailize user & edge server
-        es = generate_es(main_args.M)
+        es = generate_es(M)
         users = generate_users(
             main_args.N,
-            main_args.M,
+            M,
             user_model,
             dataset,
             seed,
