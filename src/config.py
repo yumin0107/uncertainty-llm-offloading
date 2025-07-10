@@ -11,18 +11,17 @@ FIXED_ES = [
 ]  # es position
 
 # Communication
-BANDWIDTH = 1e7  # Hz
-TRANSMIT_POWER = 0.1  # W
-NOISE_POWER = 0.1
+BANDWIDTH = 10e6  # Hz
+TRANSMIT_POWER = 0.2  # W
+NOISE_POWER = 4e-21 * BANDWIDTH * 3.16
 FREQUENCY = 3.5e9
 LIGHTSPEED = 3e8
 
 # Computation
-LOCAL_COMPUTE_CAP = 2e9  # C_L (2 GHz)
-EDGE_COMPUTE_CAP = 100e9  # C_ES (100 GHz)
-MAX_COMPUTE_PER_USER = 10e9  # C_max (10 GHz)
+LOCAL_COMPUTE_CAP = 91.06e12  # C_L (2 GHz)
+EDGE_COMPUTE_CAP = 91.06e12  # C_ES (100 GHz)
 
 # Model
 SLM = "meta-llama/Llama-3.2-1B-Instruct"
-LLM = "meta-llama/Llama-3.2-3B-Instruct"
+LLM = "meta-llama/Llama-3.1-8B-Instruct"
 K = 10

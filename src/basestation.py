@@ -1,3 +1,4 @@
+import copy
 import math
 from typing import List, Dict, Optional
 
@@ -39,8 +40,31 @@ class User:
 
         self.uncertainty = 1.0 - (self.p_k[0] - self.p_k[1])
 
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        new = cls(
+            self.id,
+            self.D,
+            list(self.h).append,
+            self.P,
+            self.sigma2,
+            copy.deepcopy(self.input, memo),
+            copy.deepcopy(self.lable, memo),
+            self.W_i_SLM,
+            self.W_i_LLM,
+            self.C_i_L,
+            list(self.p_k),
+        )
+        new.t_comm = self.t_comm
+        new.t_comp = self.t_comp
+        new.prediction = self.prediction
+        new.uncertainty = self.uncertainty
+
+        memo[id(self)] = new
+        return new
+
     def comm_delay(self, B_j: float, j: int) -> float:
-        R_ij = B_j * math.log2(1 + self.P * abs(self.h[j]) / self.sigma2)
+        R_ij = B_j * math.log2(1 + self.P * abs(self.h[j]) ** 2 / self.sigma2)
         return self.D / R_ij if R_ij > 0 else float("inf")
 
     def local_comp_delay(self) -> float:
@@ -48,15 +72,22 @@ class User:
 
 
 class EdgeServer:
-    def __init__(self, id: int, pos: tf.Tensor, B: float, C_ES: float, C_max: float):
+    def __init__(self, id: int, pos: tf.Tensor, B: float, C_ES: float):
         self.id = id
         self.pos = pos
         self.B = B
         self.C_ES = C_ES
-        self.C_max = C_max
 
         self.B_j = B
         self.users: List[User] = []
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        new = cls(self.id, self.pos, self.B, self.C_ES)
+        new.users = []
+
+        memo[id(self)] = new
+        return new
 
     def add_user(self, user: User):
         self.users.append(user)
@@ -65,12 +96,9 @@ class EdgeServer:
     def bandwidth_allocation(self, n_offloaded: int) -> float:
         return self.B / n_offloaded
 
-    def compute_allocation(self, n_offloaded: int) -> float:
-        return max(self.C_max, self.C_ES / n_offloaded)
-
-    def edge_comp_delay(self, u: User, C_j_ES: float) -> float:
-        return u.W_i_LLM / C_j_ES
+    def edge_comp_delay(self, u: User) -> float:
+        return u.W_i_LLM / self.C_ES
 
     def total_comm_delay(self, u: User) -> float:
-        R_ij = self.B_j * math.log2(1 + u.P * abs(u.h[self.id]) / u.sigma2)
+        R_ij = self.B_j * math.log2(1 + u.P * abs(u.h[self.id]) ** 2 / u.sigma2)
         return u.D / R_ij
