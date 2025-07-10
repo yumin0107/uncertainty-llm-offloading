@@ -1,9 +1,21 @@
 # src/config.py
 
+# Position Setting
+M = 4  # number of ES
+D = 500  # grid size
+FIXED_ES = [
+    [125.0, 125.0],
+    [125.0, 375.0],
+    [375.0, 125.0],
+    [375.0, 375.0],
+]  # es position
+
 # Communication
 BANDWIDTH = 1e7  # Hz
 TRANSMIT_POWER = 0.1  # W
 NOISE_POWER = 0.1
+FREQUENCY = 3.5e9
+LIGHTSPEED = 3e8
 
 # Computation
 LOCAL_COMPUTE_CAP = 2e9  # C_L (2 GHz)

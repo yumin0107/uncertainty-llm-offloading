@@ -3,6 +3,8 @@ from typing import List, Dict, Optional
 
 from config import BANDWIDTH, TRANSMIT_POWER, NOISE_POWER
 
+import tensorflow as tf
+
 
 class User:
     def __init__(
@@ -46,8 +48,9 @@ class User:
 
 
 class EdgeServer:
-    def __init__(self, id, B: float, C_ES: float, C_max: float):
+    def __init__(self, id: int, pos: tf.Tensor, B: float, C_ES: float, C_max: float):
         self.id = id
+        self.pos = pos
         self.B = B
         self.C_ES = C_ES
         self.C_max = C_max

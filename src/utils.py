@@ -5,7 +5,10 @@ from transformers import AutoConfig
 import numpy as np
 import torch
 import tensorflow as tf
-from sionna.channel import RayleighBlockFading
+from sionna.channel import RayleighBlockFading, AWGN
+from sionna.channel.utils import gen_single_sector_topology
+
+from config import FREQUENCY, LIGHTSPEED, NOISE_POWER
 
 
 def estimate_workload(input_length: int, model_name: str) -> float:
@@ -30,10 +33,17 @@ def estimate_workload(input_length: int, model_name: str) -> float:
     return total_flops
 
 
-def generate_rayleigh_coeffs(M: int) -> np.ndarray:
-    rayleigh = RayleighBlockFading(num_rx=1, num_tx=1, num_rx_ant=1, num_tx_ant=1)
-    h, _ = rayleigh(batch_size=M, num_time_steps=1)
-    h = tf.squeeze(h, axis=[1, 2, 3, 4, 5])
+def generate_rayleigh_coeffs(M: int, d_i: tf.float32) -> np.ndarray:
+    fspl = LIGHTSPEED / (4 * np.pi * FREQUENCY * d_i)  # d_i: 1 x M
+    large_scale_gain = tf.reshape(tf.cast(fspl, tf.complex64), [1, 1, 1, M, 1, 1, 1])
+
+    rayleigh = RayleighBlockFading(num_rx=1, num_rx_ant=1, num_tx=M, num_tx_ant=1)
+    awgn_channel = AWGN()
+    h_small, _ = rayleigh(batch_size=1, num_time_steps=1)  # [1, 1, 1, M, 1, 1, 1]
+
+    h = h_small * large_scale_gain
+
+    h = tf.squeeze(h, axis=None)
     return h.numpy()
 
 
