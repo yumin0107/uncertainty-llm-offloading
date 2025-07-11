@@ -16,18 +16,18 @@ class HuggingfaceModel(BaseModel):
     def generate(self, prompt: str) -> Tuple[str, float]:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
-        self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-        out = self.model.generate(
-            **inputs,
-            max_new_tokens=5,
-            temperature=1,
-            do_sample=True,
-            pad_token_id=self.tokenizer.eos_token_id
-        )
+        with torch.no_grad():
+            out = self.model.generate(
+                **inputs,
+                max_new_tokens=5,
+                do_sample=False,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
 
         torch.cuda.synchronize()
         start = time.time()
-        _ = self.model.generate(**inputs)
+        with torch.no_grad():
+            _ = self.model.generate(**inputs, max_new_tokens=5, do_sample=False)
         torch.cuda.synchronize()
         end = time.time()
 
@@ -52,4 +52,12 @@ class HuggingfaceModel(BaseModel):
         merged_topk = sorted(prob_dict.items(), key=lambda x: x[1], reverse=True)[:k]
         total = sum(p for _, p in merged_topk)
         normalized_topk = [(token, p / total) for token, p in merged_topk]
-        return normalized_topk
+
+        torch.cuda.synchronize()
+        start = time.time()
+        with torch.no_grad():
+            _ = self.model.generate(**inputs, max_new_tokens=5, do_sample=False)
+        torch.cuda.synchronize()
+        end = time.time()
+
+        return normalized_topk, end - start

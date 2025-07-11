@@ -19,10 +19,11 @@ def uncertainty_aware_offloading(
         delta_p: Dict[EdgeServer, float] = {}
         for e in es:
             B_j = e.bandwidth_allocation(len(e.users) + 1)
+            C_j_ES = e.compute_allocation(len(e.users) + 1)
 
             t_j_comm = u_p.comm_delay(B_j, e.id)
-            t_j_comp_ES = e.edge_comp_delay(u_p)
-            t_j_comp_L = u_p.local_comp_delay()
+            t_j_comp_ES = e.edge_comp_delay(u_p, C_j_ES)
+            t_j_comp_L = u_p.t_comp
 
             delta_p[e] = t_j_comm + t_j_comp_ES - t_j_comp_L
 
@@ -31,6 +32,7 @@ def uncertainty_aware_offloading(
         decisions[u_p.id][e_p.id] = 1
         e_p.add_user(u_p)
         e_p.B_j = e_p.bandwidth_allocation(len(e_p.users))
+        e_p.C_j_ES = e_p.compute_allocation(len(e_p.users))
 
         remaining_uids.remove(u_p_id)
 
@@ -39,10 +41,11 @@ def uncertainty_aware_offloading(
         u = id_to_user[uid]
         for e in es:
             B_j = e.bandwidth_allocation(len(e.users) + 1)
+            C_j_ES = e.compute_allocation(len(e.users) + 1)
 
             t_j_comm = u.comm_delay(B_j, e.id)
-            t_j_comp_ES = e.edge_comp_delay(u)
-            t_j_comp_L = u.local_comp_delay()
+            t_j_comp_ES = e.edge_comp_delay(u, C_j_ES)
+            t_j_comp_L = u.t_comp
 
             delta[(uid, e.id)] = t_j_comm + t_j_comp_ES - t_j_comp_L
 
@@ -62,17 +65,19 @@ def uncertainty_aware_offloading(
         decisions[u_p.id][e_p.id] = 1
         e_p.add_user(u_p)
         e_p.B_j = e_p.bandwidth_allocation(len(e_p.users))
+        e_p.C_j_ES = e_p.compute_allocation(len(e_p.users))
         remaining_uids.remove(u_p_id)
 
         for uid in remaining_uids:
             u = id_to_user[uid]
             for e in es:
                 B_j = e.bandwidth_allocation(len(e.users) + 1)
+                C_j_ES = e.compute_allocation(len(e.users) + 1)
 
                 t_j_comm = u.comm_delay(B_j, e.id)
-                t_j_comp_ES = e.edge_comp_delay(u)
-                t_j_comp_L = u.local_comp_delay()
+                t_j_comp_ES = e.edge_comp_delay(u, C_j_ES)
+                t_j_comp_L = u.t_comp
 
                 delta[(uid, e.id)] = t_j_comm + t_j_comp_ES - t_j_comp_L
 
-    return decisions
+    return decisions, len(us) - len(remaining_uids)

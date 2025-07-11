@@ -20,10 +20,10 @@ import pandas as pd
 
 # Communication
 from basestation import User, EdgeServer
-from user_association_ua import uncertainty_aware_offloading
-from user_association_none import none_offloading
-from user_association_all import all_offloading
-from user_association_random import random_offloading
+from user_association.user_association_ua import uncertainty_aware_offloading
+from user_association.user_association_none import none_offloading
+from user_association.user_association_all import all_offloading
+from user_association.user_association_random import random_offloading
 from utils import (
     generate_rayleigh_coeffs,
     bit_size_text,
