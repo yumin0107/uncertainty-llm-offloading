@@ -1,6 +1,6 @@
 import time
 import re
-from typing import Dict
+from typing import Dict, List, Tuple
 
 from transformers import AutoConfig
 import numpy as np
@@ -10,29 +10,7 @@ from sionna.channel import RayleighBlockFading, AWGN
 from sionna.channel.utils import gen_single_sector_topology
 
 from config import FREQUENCY, LIGHTSPEED, NOISE_POWER
-
-
-def estimate_workload(input_length: int, model_name: str) -> float:
-
-    try:
-        cfg = AutoConfig.from_pretrained(model_name)
-    except Exception as e:
-        raise ValueError(f"Cannot load config for '{model_name}': {e}")
-
-    n_layers = cfg.num_hidden_layers
-    d_model = cfg.hidden_size
-    d_ff = getattr(cfg, "intermediate_size", 4 * d_model)
-
-    # Compute FLOPs per layer
-    flops_attn = 4 * input_length * (d_model**2)
-    flops_ffn = 4 * input_length * d_model * d_ff
-    flops_per_layer = flops_attn + flops_ffn
-
-    flops_attn_extra = 2 * input_length * d_model**2 * n_layers
-    # Total FLOPs for all layers
-    total_flops = flops_per_layer * (n_layers + 1) + flops_attn_extra
-
-    return total_flops
+from basestation import User, EdgeServer
 
 
 def generate_rayleigh_coeffs(M: int, d_i: tf.float32) -> np.ndarray:
@@ -61,3 +39,31 @@ def is_correct(prediction: str, answer: str) -> bool:
 
 def is_offloading(u_id: int, decisions: Dict[int, Dict[int, int]]) -> bool:
     return any(value == 1 for value in decisions[u_id].values())
+
+
+def calc_delay_accuracy(
+    users: List[User],
+    user_model,
+    es: List[EdgeServer],
+    edge_model,
+    decisions: Dict[int, Dict[int, int]],
+) -> Tuple[float, float]:
+    delay = 0
+    correct = 0
+    total = 0
+
+    for u in users:
+        output_SLM, inf_delay_SLM = user_model.generate(u.input)
+        output_LLM, inf_delay_LLM = edge_model.generate(u.input)
+        pred_SLM = output_SLM[len(u.input) :]
+        pred_LLM = output_LLM[len(u.input) :]
+        user_to_server = {u.id: e for e in es for u in e.users}
+        if is_offloading(u.id, decisions):
+            e = user_to_server[u.id]
+            delay += inf_delay_LLM / (e.C_j_ES / u.C_i_L) + e.total_comm_delay(u)
+            correct += is_correct(pred_LLM, u.label)
+        else:
+            delay += inf_delay_SLM
+            correct += is_correct(pred_SLM, u.label)
+        total += 1
+    return delay / len(users) * 1000, correct / total * 100
