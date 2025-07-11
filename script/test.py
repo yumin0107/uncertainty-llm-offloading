@@ -2,8 +2,8 @@ import sys
 import os
 import argparse
 import random
+import gc
 from pprint import pprint
-from copy import deepcopy
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -20,14 +20,16 @@ import pandas as pd
 
 # Communication
 from basestation import User, EdgeServer
-from user_association import uncertainty_aware_offloading
+from user_association_ua import uncertainty_aware_offloading
+from user_association_none import none_offloading
+from user_association_all import all_offloading
 from user_association_random import random_offloading
 from utils import (
-    estimate_workload,
     generate_rayleigh_coeffs,
     bit_size_text,
     is_correct,
     is_offloading,
+    calc_delay_accuracy,
 )
 from config import (
     M,
@@ -38,6 +40,7 @@ from config import (
     NOISE_POWER,
     LOCAL_COMPUTE_CAP,
     EDGE_COMPUTE_CAP,
+    MAX_COMPUTE_PER_USER,
     SLM,
     LLM,
     K,
@@ -50,7 +53,10 @@ from model import get_model
 
 def generate_es(M: int) -> list[EdgeServer]:
     es_pos = tf.constant(FIXED_ES, dtype=tf.float32)
-    return [EdgeServer(i, es_pos[i], BANDWIDTH, EDGE_COMPUTE_CAP) for i in range(M)]
+    return [
+        EdgeServer(i, es_pos[i], BANDWIDTH, EDGE_COMPUTE_CAP, MAX_COMPUTE_PER_USER)
+        for i in range(M)
+    ]
 
 
 def generate_users(
@@ -81,20 +87,16 @@ def generate_users(
         question = ds[i]["question"]
         answer = ds[i]["answer"]
         text = (
-            f"Instruction: Answer with only one word. No explanation."
+            f"Instruction: Answer with only one word. No explanation.\n"
             f"Context: {passage.strip()}\n"
             f"Question: {question.strip()}\n"
             f"Answer(only one word):"
         )
 
-        tokens = model.tokenizer.encode(text, truncation=True)
         D_i = bit_size_text(text)
 
-        topk = model.topk_probs(text, k=K)
+        topk, t_comp = model.topk_probs(text, k=K)
         p_topk = [prob for _, prob in topk]
-
-        W_i_SLM = estimate_workload(len(tokens), SLM)
-        W_i_LLM = estimate_workload(len(tokens), LLM)
 
         h_list = generate_rayleigh_coeffs(M, d[i])
 
@@ -107,8 +109,7 @@ def generate_users(
                 sigma2=sigma2,
                 input=text,
                 label=answer,
-                W_i_SLM=W_i_SLM,
-                W_i_LLM=W_i_LLM,
+                t_comp=t_comp,
                 C_i_L=C_L,
                 p_k=p_topk,
             )
@@ -129,34 +130,29 @@ if __name__ == "__main__":
     main_args = parser.parse_args()
 
     # load model & dataset
+    gc.collect()
+    torch.cuda.empty_cache()
     user_model = get_model(SLM)
     edge_model = get_model(LLM)
-    ##############################################
-    ################# 경로 수정 필요 ###############
-    dataset = load_dataset("Muennighoff/babi", split="train")
-    ##############################################
-    ##############################################
 
-    n_run = 10
+    ds = load_dataset("Muennighoff/babi", split="train")
+    exclude_tasks = [7, 8, 19]
+    dataset = ds.filter(lambda example: example["task"] not in exclude_tasks)
+
+    n_run = 1
     b_seed = 42
-    correct_count_SLM = 0
-    correct_count_LLM = 0
-    correct_count_offloading = 0
-    correct_count_random = 0
-    total_delay_SLM = 0
-    total_delay_offloading = 0
-    total_delay_random = 0
-    total_delay_LLM = 0
-    total_count = 0
+    total_accuracy_list = []  # [SLM, uao, random, LLM]
+    total_delay_list = []  # [SLM, uao, random, LLM]
 
     for i in range(n_run):
         print(f"iteration {i+1}")
         seed = b_seed + i
 
         # initailize user & edge server
-        es = generate_es(M)
-        es_ua = deepcopy(es)
-        es_rand = deepcopy(es)
+        es_none = generate_es(M)
+        es_uao = generate_es(M)
+        es_rand = generate_es(M)
+        es_all = generate_es(M)
         users = generate_users(
             main_args.N,
             M,
@@ -169,86 +165,58 @@ if __name__ == "__main__":
         )
 
         # ua
-        decisions = uncertainty_aware_offloading(users, es_ua, main_args.tau)
-        decisions_random = random_offloading(users, es_rand)
+        decisions_none = none_offloading(users, es_none)
+        decisions_uao, n_offloaded = uncertainty_aware_offloading(
+            users, es_uao, main_args.tau
+        )
+        decisions_rand = random_offloading(users, es_rand, n_offloaded)
+        decisions_all = all_offloading(users, es_all)
 
-        # delay & accuracy
-        for u in users:
-            output_SLM, inf_delay_SLM = user_model.generate(u.input)
-            output_LLM, inf_delay_LLM = edge_model.generate(u.input)
-            pred_SLM = output_SLM[len(u.input) :]
-            pred_LLM = output_LLM[len(u.input) :]
+        d_none, a_none = calc_delay_accuracy(
+            users, user_model, es_none, edge_model, decisions_none
+        )
+        d_uao, a_uao = calc_delay_accuracy(
+            users, user_model, es_uao, edge_model, decisions_uao
+        )
+        d_rand, a_rand = calc_delay_accuracy(
+            users, user_model, es_rand, edge_model, decisions_rand
+        )
+        d_all, a_all = calc_delay_accuracy(
+            users, user_model, es_all, edge_model, decisions_all
+        )
 
-            # offloading
-            if is_offloading(u.id, decisions):
-                for e in es_ua:
-                    if u in e.users:
-                        u.t_comp = inf_delay_LLM
-                        u.t_comm = e.total_comm_delay(u)
-                        u.prediction = pred_LLM
-                        break
-            else:
-                u.t_comp = inf_delay_SLM
-                u.t_comm = 0
-                u.prediction = pred_SLM
+        total_delay_list.append([d_none, d_uao, d_rand, d_all])
+        total_accuracy_list.append([a_none, a_uao, a_rand, a_all])
 
-            # random
-            if is_offloading(u.id, decisions_random):
-                for e in es_rand:
-                    if u in e.users:
-                        total_delay_random += inf_delay_LLM + e.total_comm_delay(u)
-                        correct_count_random += is_correct(pred_LLM, u.label)
-                        break
-            else:
-                total_delay_random += inf_delay_SLM
-                correct_count_random += is_correct(pred_SLM, u.label)
-
-            total_delay_SLM += inf_delay_SLM
-            total_delay_offloading += u.t_comp + u.t_comm
-            total_delay_LLM += inf_delay_LLM + e.total_comm_delay(u)
-
-            # print(inf_delay_SLM)
-            # print(e.total_comm_delay(u))
-            # print(inf_delay_LLM)
-
-            correct_count_SLM += is_correct(pred_SLM, u.label)
-            correct_count_offloading += is_correct(u.prediction, u.label)
-            correct_count_LLM += is_correct(pred_LLM, u.label)
-            total_count += 1
-
-    accuracy_SLM = correct_count_SLM / total_count * 100
-    accuracy_offloading = correct_count_offloading / total_count * 100
-    accuracy_random = correct_count_random / total_count * 100
-    accuracy_LLM = correct_count_LLM / total_count * 100
-
-    delay_SLM = total_delay_SLM / (main_args.N * n_run)
-    delay_offloading = total_delay_offloading / (main_args.N * n_run)
-    delay_random = total_delay_random / (main_args.N * n_run)
-    delay_LLM = total_delay_LLM / (main_args.N * n_run)
+    accuracy_avg = np.mean(total_accuracy_list, axis=0)
+    delay_avg = np.mean(total_delay_list, axis=0)
 
 print("\n=== Accuracy Metrics ===")
-print(f"SLM Accuracy        : {accuracy_SLM:.2f}%")
-print(f"Offloading Accuracy : {accuracy_offloading:.2f}%")
-print(f"Random Accuracy     : {accuracy_random:.2f}%")
-print(f"LLM Accuracy        : {accuracy_LLM:.2f}%")
+print(f"{'Accuracy_Local_All (n=0)':<35}: {accuracy_avg[0]:>6.2f}%")
+print(f"{'Accuracy_UAO       (n='+str(n_offloaded)+')':<35}: {accuracy_avg[1]:>6.2f}%")
+print(f"{'Accuracy_Random    (n='+str(n_offloaded)+')':<35}: {accuracy_avg[2]:>6.2f}%")
+print(f"{'Accuracy_Edge_All  (n='+str(main_args.N)+')':<35}: {accuracy_avg[3]:>6.2f}%")
 
 print("\n=== Inference Delay (per sample) ===")
-print(f"SLM Delay           : {delay_SLM*1000:.3f} ms")
-print(f"Offloading Delay    : {delay_offloading*1000:.3f} ms")
-print(f"Random Delay        : {delay_random*1000:.3f} ms")
-print(f"LLM Delay           : {delay_LLM*1000:.3f} ms")
+print(f"{'Delay_Local_All':<35}: {delay_avg[0]:>7.3f} ms")
+print(f"{'Delay_UAO':<35}: {delay_avg[1]:>7.3f} ms")
+print(f"{'Delay_Random':<35}: {delay_avg[2]:>7.3f} ms")
+print(f"{'Delay_Edge_All':<35}: {delay_avg[3]:>7.3f} ms")
+
 
 df = pd.DataFrame(
     [
         {
-            "accuracy_SLM": accuracy_SLM,
-            "accuracy_offloading": accuracy_offloading,
-            "accuracy_random": accuracy_random,
-            "accuracy_LLM": accuracy_LLM,
-            "delay_SLM": delay_SLM,
-            "delay_offloading": delay_offloading,
-            "delay_random": delay_random,
-            "delay_LLM": delay_LLM,
+            "accuracy_local_all": accuracy_avg[0],
+            "accuracy_uao": accuracy_avg[1],
+            "accuracy_random": accuracy_avg[2],
+            "accuracy_edge_all": accuracy_avg[3],
+            "delay_local_all": delay_avg[0],
+            "delay_uao": delay_avg[1],
+            "delay_random": delay_avg[2],
+            "delay_edge_all": delay_avg[3],
+            "N_offloaded": n_offloaded,
+            "N": main_args.N,
         }
     ]
 )
