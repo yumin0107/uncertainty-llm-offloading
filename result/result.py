@@ -26,7 +26,7 @@ os.makedirs(plot_dir, exist_ok=True)
 
 
 def plot_accuracy_vs_tau(df, fixed_N, save=True):
-    sub = df[df["N"] == fixed_N]
+    sub = df[df["N"] == fixed_N].sort_values(by="tau").reset_index(drop=True)
 
     plt.figure()
     for method in ["local_all", "uao", "random", "edge_all"]:
@@ -36,7 +36,7 @@ def plot_accuracy_vs_tau(df, fixed_N, save=True):
     plt.ylabel("Accuracy")
     plt.title(f"Accuracy vs tau (N={fixed_N})")
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, linestyle="--", alpha=0.5)
     plt.tight_layout()
 
     if save:
@@ -47,7 +47,11 @@ def plot_accuracy_vs_tau(df, fixed_N, save=True):
 
 
 def plot_accuracy_vs_N(df, fixed_tau, save=True):
-    sub = df[df["tau"] == fixed_tau]
+    sub = (
+        df[(df["tau"] == fixed_tau) & (df["N"] != 100)]
+        .sort_values(by="N")
+        .reset_index(drop=True)
+    )
 
     plt.figure()
     for method in ["local_all", "uao", "random", "edge_all"]:
@@ -57,7 +61,8 @@ def plot_accuracy_vs_N(df, fixed_tau, save=True):
     plt.ylabel("Accuracy")
     plt.title(f"Accuracy vs N (tau={fixed_tau})")
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.xticks(range(150, sub["N"].max() + 1, 50))
     plt.tight_layout()
 
     if save:
@@ -67,8 +72,56 @@ def plot_accuracy_vs_N(df, fixed_tau, save=True):
     plt.close()
 
 
+def plot_delay_vs_tau(df, fixed_N, save=True):
+    sub = df[df["N"] == fixed_N].sort_values(by="tau").reset_index(drop=True)
+
+    plt.figure()
+    for method in ["local_all", "uao", "random", "edge_all"]:
+        plt.plot(sub["tau"], sub[f"delay_{method}"], marker="o", label=method)
+
+    plt.xlabel("tau")
+    plt.ylabel("Delay")
+    plt.title(f"Delay vs tau (N={fixed_N})")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+
+    if save:
+        fname = f"delay_vs_tau_N{fixed_N}.png"
+        plt.savefig(os.path.join(plot_dir, fname))
+
+    plt.close()
+
+
+def plot_delay_vs_N(df, fixed_tau, save=True):
+    sub = (
+        df[(df["tau"] == fixed_tau) & (df["N"] != 100)]
+        .sort_values(by="N")
+        .reset_index(drop=True)
+    )
+
+    plt.figure()
+    for method in ["local_all", "uao", "random", "edge_all"]:
+        plt.plot(sub["N"], sub[f"delay_{method}"], marker="o", label=method)
+
+    plt.xlabel("N")
+    plt.ylabel("Delay")
+    plt.title(f"Delay vs N (tau={fixed_tau})")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.tight_layout()
+
+    if save:
+        fname = f"delay_vs_N_tau{fixed_tau}.png"
+        plt.savefig(os.path.join(plot_dir, fname))
+
+    plt.close()
+
+
 for tau_val in sorted(full_df["tau"].unique()):
     plot_accuracy_vs_N(full_df, fixed_tau=tau_val, save=True)
+    plot_delay_vs_N(full_df, fixed_tau=tau_val, save=True)
 
 for N_val in sorted(full_df["N"].unique()):
     plot_accuracy_vs_tau(full_df, fixed_N=N_val, save=True)
+    plot_delay_vs_tau(full_df, fixed_N=N_val, save=True)
