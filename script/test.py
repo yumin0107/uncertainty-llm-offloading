@@ -139,7 +139,7 @@ if __name__ == "__main__":
     exclude_tasks = [7, 8, 19]
     dataset = ds.filter(lambda example: example["task"] not in exclude_tasks)
 
-    n_run = 1
+    n_run = 10
     b_seed = 42
     total_accuracy_list = []  # [SLM, uao, random, LLM]
     total_delay_list = []  # [SLM, uao, random, LLM]
