@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 
-output_dir = os.path.join(os.path.dirname(__file__), "..", "result")
+output_dir = os.path.join(os.path.dirname(__file__), "..", "result/data")
 
 csv_files = glob.glob(os.path.join(output_dir, "results_*.csv"))
 
