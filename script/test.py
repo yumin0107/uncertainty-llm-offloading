@@ -220,6 +220,6 @@ df = pd.DataFrame(
         }
     ]
 )
-output_dir = os.path.join(os.path.dirname(__file__), "..", "result")
+output_dir = os.path.join(os.path.dirname(__file__), "..", "result/data")
 out_fname = os.path.join(output_dir, f"results_N{main_args.N}_tau{main_args.tau}.csv")
 df.to_csv(out_fname, index=False)
