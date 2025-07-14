@@ -13,27 +13,9 @@ class HuggingfaceModel(BaseModel):
         self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         self.model.eval()
 
-    def generate(self, prompt: str) -> Tuple[str, float]:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-
-        with torch.no_grad():
-            out = self.model.generate(
-                **inputs,
-                max_new_tokens=5,
-                do_sample=False,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-
-        torch.cuda.synchronize()
-        start = time.time()
-        with torch.no_grad():
-            _ = self.model.generate(**inputs, max_new_tokens=5, do_sample=False)
-        torch.cuda.synchronize()
-        end = time.time()
-
-        return self.tokenizer.decode(out[0], skip_special_tokens=True), end - start
-
-    def topk_probs(self, prompt: str, k: int) -> List[Tuple[str, float]]:
+    def generate(
+        self, prompt: str, k: int
+    ) -> Tuple[List[Tuple[str, float]], float, str]:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         with torch.no_grad():
             logits = self.model(**inputs).logits  # (1, L, V)
@@ -56,8 +38,12 @@ class HuggingfaceModel(BaseModel):
         torch.cuda.synchronize()
         start = time.time()
         with torch.no_grad():
-            _ = self.model.generate(**inputs, max_new_tokens=5, do_sample=False)
+            out = self.model.generate(**inputs, max_new_tokens=5, do_sample=False)
         torch.cuda.synchronize()
         end = time.time()
 
-        return normalized_topk, end - start
+        return (
+            normalized_topk,
+            end - start,
+            self.tokenizer.decode(out[0], skip_special_tokens=True),
+        )

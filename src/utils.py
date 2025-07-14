@@ -6,10 +6,10 @@ from transformers import AutoConfig
 import numpy as np
 import torch
 import tensorflow as tf
-from sionna.channel import RayleighBlockFading, AWGN
+from sionna.channel import RayleighBlockFading
 from sionna.channel.utils import gen_single_sector_topology
 
-from config import FREQUENCY, LIGHTSPEED, NOISE_POWER
+from config import FREQUENCY, LIGHTSPEED, LOCAL_COMPUTE_CAP
 from basestation import User, EdgeServer
 
 
@@ -18,7 +18,6 @@ def generate_rayleigh_coeffs(M: int, d_i: tf.float32) -> np.ndarray:
     large_scale_gain = tf.reshape(tf.cast(fspl, tf.complex64), [1, 1, 1, M, 1, 1, 1])
 
     rayleigh = RayleighBlockFading(num_rx=1, num_rx_ant=1, num_tx=M, num_tx_ant=1)
-    awgn_channel = AWGN()
     h_small, _ = rayleigh(batch_size=1, num_time_steps=1)  # [1, 1, 1, M, 1, 1, 1]
 
     h = h_small * large_scale_gain
@@ -43,9 +42,7 @@ def is_offloading(u_id: int, decisions: Dict[int, Dict[int, int]]) -> bool:
 
 def calc_delay_accuracy(
     users: List[User],
-    user_model,
     es: List[EdgeServer],
-    edge_model,
     decisions: Dict[int, Dict[int, int]],
 ) -> Tuple[float, float]:
     delay = 0
@@ -53,17 +50,17 @@ def calc_delay_accuracy(
     total = 0
 
     for u in users:
-        output_SLM, inf_delay_SLM = user_model.generate(u.input)
-        output_LLM, inf_delay_LLM = edge_model.generate(u.input)
-        pred_SLM = output_SLM[len(u.input) :]
-        pred_LLM = output_LLM[len(u.input) :]
+        pred_SLM = u.output_SLM[len(u.input) :]
+        pred_LLM = u.output_LLM[len(u.input) :]
         user_to_server = {u.id: e for e in es for u in e.users}
         if is_offloading(u.id, decisions):
             e = user_to_server[u.id]
-            delay += inf_delay_LLM / (e.C_j_ES / u.C_i_L) + e.total_comm_delay(u)
+            delay += u.t_comp_llm / (e.C_j_ES / LOCAL_COMPUTE_CAP) + e.total_comm_delay(
+                u
+            )
             correct += is_correct(pred_LLM, u.label)
         else:
-            delay += inf_delay_SLM
+            delay += u.t_comp_slm
             correct += is_correct(pred_SLM, u.label)
         total += 1
     return delay / len(users) * 1000, correct / total * 100

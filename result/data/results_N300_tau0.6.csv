@@ -1,2 +1,2 @@
-accuracy_local_all,accuracy_uao,accuracy_random,accuracy_edge_all,delay_local_all,delay_uao,delay_random,delay_edge_all,N_offloaded,N
-43.96666666666667,52.466666666666676,49.63333333333334,54.7,30.429753144582115,42.88433364448323,42.25112742515539,82.89576317360763,183,300
+accuracy_local_all,accuracy_uao,accuracy_random_1,accuracy_random_2,accuracy_random_3,accuracy_edge_all,accuracy_dmin,delay_local_all,delay_uao,delay_random_1,delay_random_2,delay_random_3,delay_edge_all,delay_dmin,N_uao,N_rand_2,N_rand_3,N_dmin,N
+43.96666666666667,52.466666666666676,49.63333333333334,52.466666666666676,49.2,54.7,46.866666666666674,34.89087465662597,47.731526175986374,47.211413138319145,67.00641028931491,40.14121699089735,91.62237247459817,28.838047908705676,183,248,138,100,300
