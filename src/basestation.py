@@ -16,8 +16,11 @@ class User:
         P: float,
         sigma2: float,
         input: any,
+        output_slm: any,
+        output_llm: any,
         label: any,
-        t_comp,
+        t_comp_slm: float,
+        t_comp_llm: float,
         C_i_L: float,
         p_k: List[float],
     ):
@@ -27,8 +30,11 @@ class User:
         self.P = P
         self.sigma2 = sigma2
         self.input = input
+        self.output_SLM = output_slm
+        self.output_LLM = output_llm
         self.label = label
-        self.t_comp = t_comp
+        self.t_comp_slm = t_comp_slm
+        self.t_comp_llm = t_comp_llm
         self.C_i_L = C_i_L
         self.p_k = p_k
 
@@ -66,7 +72,7 @@ class EdgeServer:
 
     def edge_comp_delay(self, u: User, C_j_ES: float) -> float:
         cap_ratio = C_j_ES / u.C_i_L
-        return u.t_comp * 8 / cap_ratio
+        return u.t_comp_slm * 8 / cap_ratio
 
     def total_comm_delay(self, u: User) -> float:
         R_ij = self.B_j * math.log2(1 + u.P * abs(u.h[self.id]) ** 2 / u.sigma2)

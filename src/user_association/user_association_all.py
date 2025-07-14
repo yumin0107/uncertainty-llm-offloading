@@ -18,7 +18,7 @@ def all_offloading(us: List[User], es: List[EdgeServer]) -> Dict[int, Dict[int, 
 
             t_j_comm = u_p.comm_delay(B_j, e.id)
             t_j_comp_ES = e.edge_comp_delay(u_p, C_j_ES)
-            t_j_comp_L = u_p.t_comp
+            t_j_comp_L = u_p.t_comp_slm
 
             delta_p[e] = t_j_comm + t_j_comp_ES - t_j_comp_L
 
