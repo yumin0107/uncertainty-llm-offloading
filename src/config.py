@@ -11,7 +11,7 @@ FIXED_ES = [
 ]  # es position
 
 # Communication
-BANDWIDTH = 10e6  # Hz
+BANDWIDTH = 10e7  # Hz
 TRANSMIT_POWER = 0.2  # W
 NOISE_POWER = 4e-21 * BANDWIDTH
 FREQUENCY = 3.5e9

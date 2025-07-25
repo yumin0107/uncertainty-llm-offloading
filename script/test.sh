@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-Ns=(100 140 180 220 260 300 340)
-taus=(0.5 0.6)
+Ns=(80 90 100 110 120)
+taus=(0.6)
 
 for N in "${Ns[@]}"; do
   for tau in "${taus[@]}"; do
@@ -15,5 +15,3 @@ for N in "${Ns[@]}"; do
     echo
   done
 done
-
-python ../result/result.py

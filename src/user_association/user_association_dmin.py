@@ -1,56 +1,25 @@
 from typing import Dict, List, Tuple
 from basestation import User, EdgeServer
+from utils import calc_delay_set, add_user_to_ES
 
 
 def dmin_offloading(
     us: List[User], es: List[EdgeServer]
-) -> Tuple[Dict[int, Dict[int, int]], int]:
-    decisions: Dict[int, Dict[int, int]] = {u.id: {e.id: 0 for e in es} for u in us}
-    id_to_user: Dict[int, User] = {u.id: u for u in us}
-    remaining_uids: List[int] = list(id_to_user.keys())
+) -> Tuple[List[List[int]], int]:
+    decisions: List[List[int]] = [[0 for _ in range(len(es))] for _ in range(len(us))]
 
-    delta: Dict[Tuple[int, int], float] = {}
-    for uid in remaining_uids:
-        u = id_to_user[uid]
-        for e in es:
-            B_j = e.bandwidth_allocation(len(e.users) + 1)
-            C_j_ES = e.compute_allocation(len(e.users) + 1)
-
-            t_j_comm = u.comm_delay(B_j, e.id)
-            t_j_comp_ES = e.edge_comp_delay(u, C_j_ES)
-            t_j_comp_L = u.t_comp_slm
-
-            delta[(uid, e.id)] = t_j_comm + t_j_comp_ES - t_j_comp_L
-
-    while remaining_uids:
-        candidates = [
-            ((uid, eid), gap)
-            for (uid, eid), gap in delta.items()
-            if gap < 0 and uid in remaining_uids
-        ]
-        if not candidates:
+    I: List[User] = [u for u in us]
+    delta: Dict[int, Dict[int, float]] = calc_delay_set(I, es, decisions)
+    while I:
+        uid_p, eid_p, delta_min = min(
+            ((uid, eid, val) for uid, es in delta.items() for eid, val in es.items()),
+            key=lambda x: x[2],
+        )
+        if delta_min >= 0:
             break
 
-        (u_p_id, e_p_id), _ = min(candidates, key=lambda item: item[1])
-        u_p = id_to_user[u_p_id]
-        e_p = next(e for e in es if e.id == e_p_id)
+        add_user_to_ES(us[uid_p], es[eid_p], decisions)
+        I.remove(us[uid_p])
+        delta = calc_delay_set(I, es, decisions)
 
-        decisions[u_p.id][e_p.id] = 1
-        e_p.add_user(u_p)
-        e_p.B_j = e_p.bandwidth_allocation(len(e_p.users))
-        e_p.C_j_ES = e_p.compute_allocation(len(e_p.users))
-        remaining_uids.remove(u_p_id)
-
-        for uid in remaining_uids:
-            u = id_to_user[uid]
-            for e in es:
-                B_j = e.bandwidth_allocation(len(e.users) + 1)
-                C_j_ES = e.compute_allocation(len(e.users) + 1)
-
-                t_j_comm = u.comm_delay(B_j, e.id)
-                t_j_comp_ES = e.edge_comp_delay(u, C_j_ES)
-                t_j_comp_L = u.t_comp_slm
-
-                delta[(uid, e.id)] = t_j_comm + t_j_comp_ES - t_j_comp_L
-
-    return decisions, len(us) - len(remaining_uids)
+    return decisions, len(us) - len(I)

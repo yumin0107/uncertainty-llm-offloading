@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from config import BANDWIDTH, TRANSMIT_POWER, NOISE_POWER
 
 import tensorflow as tf
+import numpy as np
 
 
 class User:
@@ -12,7 +13,7 @@ class User:
         self,
         id: int,
         D: float,
-        h: List[complex],
+        h,  # N x M
         P: float,
         sigma2: float,
         input: any,
@@ -43,8 +44,23 @@ class User:
 
         self.uncertainty = 1.0 - (self.p_k[0] - self.p_k[1])
 
-    def comm_delay(self, B_j: float, j: int) -> float:
-        R_ij = B_j * math.log2(1 + self.P * abs(self.h[j]) ** 2 / self.sigma2)
+    def comm_delay(self, B_j: float, j: int, decisions: List[List[int]]) -> float:
+
+        mask = np.array(decisions, dtype=bool)
+
+        other = mask.copy()
+        other[:, j] = False
+        other[self.id, :] = False
+
+        interferers = other.any(axis=1)
+
+        h_abs2 = np.abs(self.h[:, j]) ** 2
+
+        interference = self.P * h_abs2[interferers].sum()
+
+        h_ij = np.abs(self.h[self.id, j])
+        sinr = (self.P * h_ij**2) / (interference + self.sigma2)
+        R_ij = B_j * math.log2(1 + sinr)
         return self.D / R_ij if R_ij > 0 else float("inf")
 
 
@@ -74,6 +90,23 @@ class EdgeServer:
         cap_ratio = C_j_ES / u.C_i_L
         return u.t_comp_slm * 8 / cap_ratio
 
-    def total_comm_delay(self, u: User) -> float:
-        R_ij = self.B_j * math.log2(1 + u.P * abs(u.h[self.id]) ** 2 / u.sigma2)
-        return u.D / R_ij
+    def total_comm_delay(
+        self, u: User, decisions: List[List[int]], B_j: float
+    ) -> float:
+
+        mask = np.array(decisions, dtype=bool)
+
+        other = mask.copy()
+        other[u.id, :] = False
+        other[:, self.id] = False
+
+        interferers = other.any(axis=1)
+
+        h_abs2 = np.abs(u.h[:, self.id]) ** 2
+
+        interference = u.P * h_abs2[interferers].sum()
+
+        h_ij = np.abs(u.h[u.id, self.id])
+        sinr = (u.P * h_ij**2) / (interference + u.sigma2)
+        R_ij = B_j * math.log2(1 + sinr)
+        return u.D / R_ij if R_ij > 0 else float("inf")

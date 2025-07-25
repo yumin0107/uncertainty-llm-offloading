@@ -1,34 +1,20 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from basestation import User, EdgeServer
+from utils import calc_delta_set, add_user_to_ES
 
 
-def all_offloading(us: List[User], es: List[EdgeServer]) -> Dict[int, Dict[int, int]]:
-    decisions: Dict[int, Dict[int, int]] = {u.id: {e.id: 0 for e in es} for u in us}
-    id_to_user: Dict[int, User] = {u.id: u for u in us}
-    remaining_uids: List[int] = list(id_to_user.keys())
+def all_offloading(us: List[User], es: List[EdgeServer]) -> List[List[int]]:
+    decisions: List[List[int]] = [[0 for _ in range(len(es))] for _ in range(len(us))]
 
-    while remaining_uids:
-        u_p_id = max(remaining_uids, key=lambda uid: id_to_user[uid].uncertainty)
-        u_p = id_to_user[u_p_id]
-
-        delta_p: Dict[EdgeServer, float] = {}
-        for e in es:
-            B_j = e.bandwidth_allocation(len(e.users) + 1)
-            C_j_ES = e.compute_allocation(len(e.users) + 1)
-
-            t_j_comm = u_p.comm_delay(B_j, e.id)
-            t_j_comp_ES = e.edge_comp_delay(u_p, C_j_ES)
-            t_j_comp_L = u_p.t_comp_slm
-
-            delta_p[e] = t_j_comm + t_j_comp_ES - t_j_comp_L
-
-        e_p = min(delta_p, key=lambda e: delta_p[e])
-
-        decisions[u_p.id][e_p.id] = 1
-        e_p.add_user(u_p)
-        e_p.B_j = e_p.bandwidth_allocation(len(e_p.users))
-        e_p.C_j_ES = e_p.compute_allocation(len(e_p.users))
-
-        remaining_uids.remove(u_p_id)
+    I: List[User] = [u for u in us]
+    delta: Dict[int, Dict[int, float]] = calc_delta_set(I, es, decisions)
+    while I:
+        uid_p, eid_p, _ = min(
+            ((uid, eid, val) for uid, es in delta.items() for eid, val in es.items()),
+            key=lambda x: x[2],
+        )
+        add_user_to_ES(us[uid_p], es[eid_p], decisions)
+        I.remove(us[uid_p])
+        delta = calc_delta_set(I, es, decisions)
 
     return decisions
