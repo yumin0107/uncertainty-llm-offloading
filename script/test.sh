@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-Ns=(50 60 70 80 90 100 110 120)
+Ns=(50 60 70 80 90 100)
 taus=(0.6)
 
 for N in "${Ns[@]}"; do

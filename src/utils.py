@@ -49,7 +49,7 @@ def calc_delay_accuracy(
     es: List[EdgeServer],
     decisions: List[List[int]],
 ) -> Tuple[float, float, float, float, float]:
-    delay_edge = 0
+    delay_total = 0
     delay_local = 0
     t_comm_sum = 0
     t_comp_sum = 0
@@ -68,22 +68,25 @@ def calc_delay_accuracy(
             B_j = e.bandwidth_allocation(n)
             t_comm = e.total_comm_delay(u, decisions, B_j)
             t_comp = u.t_comp_llm / (e.C_j_ES / LOCAL_COMPUTE_CAP)
-            delay_edge += t_comm + t_comp
+            delay_total += t_comm + t_comp
             t_comm_sum += t_comm
             t_comp_sum += t_comp
             correct += is_correct(pred_LLM, u.label)
             n_edge += 1
         else:
+            delay_total += u.t_comp_slm
             delay_local += u.t_comp_slm
             correct += is_correct(pred_SLM, u.label)
             n_local += 1
         total += 1
-    delay_edge_avg = delay_edge / n_edge * 1000 if n_edge > 0 else 0
-    delay_local_avg = delay_local / n_local * 1000 if n_local > 0 else 0
-    t_comp_avg = t_comp_sum / n_edge * 1000 if n_edge > 0 else 0
-    t_comm_avg = t_comm_sum / n_edge * 1000 if n_edge > 0 else 0
     accuracy = correct / total * 100
-    return delay_edge_avg, delay_local_avg, t_comm_avg, t_comp_avg, accuracy
+    return (
+        delay_total * 1000,
+        delay_local * 1000,
+        t_comm_sum * 1000,
+        t_comp_sum * 1000,
+        accuracy,
+    )
 
 
 def calc_delay(u: User, e: EdgeServer, decisions: List[List[int]]) -> float:

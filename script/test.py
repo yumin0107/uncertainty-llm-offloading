@@ -121,9 +121,9 @@ def main():
     with open("data.json", "r") as f:
         data = json.load(f)
 
-    n_run = 500
+    n_run = 10
     b_seed = 42
-    total_delay_edge_list = []
+    total_delay_total_list = []
     total_delay_local_list = []
     total_t_comm_list = []
     total_t_comp_list = []
@@ -169,23 +169,23 @@ def main():
         ]
         es_list = [es_none, es_uao, es_rand_1, es_all, es_ga, es_dmin]
 
-        delay_edge_list = []
+        delay_total_list = []
         delay_local_list = []
         t_comm_list = []
         t_comp_list = []
         accuracy_list = []
 
         for decisions, es in zip(decision_list, es_list):
-            delay_edge, delay_local, t_comm, t_comp, accuracy = calc_delay_accuracy(
+            delay_total, delay_local, t_comm, t_comp, accuracy = calc_delay_accuracy(
                 users, es, decisions
             )  # [ms, ms, ms, ms, %]
-            delay_edge_list.append(delay_edge)
+            delay_total_list.append(delay_total)
             delay_local_list.append(delay_local)
             t_comm_list.append(t_comm)
             t_comp_list.append(t_comp)
             accuracy_list.append(accuracy)
 
-        total_delay_edge_list.append(delay_edge_list)
+        total_delay_total_list.append(delay_total_list)
         total_delay_local_list.append(delay_local_list)
         total_t_comm_list.append(t_comm_list)
         total_t_comp_list.append(t_comp_list)
@@ -196,7 +196,7 @@ def main():
         total_t_uao += t_uao
         total_t_ga += t_ga
 
-    delay_edge_avg = np.mean(total_delay_edge_list, axis=0)
+    delay_total_avg = np.mean(total_delay_total_list, axis=0)
     delay_local_avg = np.mean(total_delay_local_list, axis=0)
     t_comm_avg = np.mean(total_t_comm_list, axis=0)
     t_comp_avg = np.mean(total_t_comp_list, axis=0)
@@ -207,48 +207,28 @@ def main():
     t_uao_avg = total_t_uao / n_run
     t_ga_avg = total_t_ga / n_run
 
-    df = pd.DataFrame(
-        [
-            {
-                "accuracy_local_all": accuracy_avg[0],
-                "accuracy_goa": accuracy_avg[1],
-                "accuracy_random_1": accuracy_avg[2],
-                "accuracy_edge_all": accuracy_avg[3],
-                "accuracy_ga": accuracy_avg[4],
-                "accuracy_dmin": accuracy_avg[5],
-                "delay_edge_local_all": delay_edge_avg[0],
-                "delay_edge_goa": delay_edge_avg[1],
-                "delay_edge_random_1": delay_edge_avg[2],
-                "delay_edge_edge_all": delay_edge_avg[3],
-                "delay_edge_ga": delay_edge_avg[4],
-                "delay_edge_dmin": delay_edge_avg[5],
-                "delay_local_local_all": delay_local_avg[0],
-                "delay_local_goa": delay_local_avg[1],
-                "delay_local_random_1": delay_local_avg[2],
-                "delay_local_edge_all": delay_local_avg[3],
-                "delay_local_ga": delay_local_avg[4],
-                "delay_local_dmin": delay_local_avg[5],
-                "t_comm_local_all": t_comm_avg[0],
-                "t_comm_goa": t_comm_avg[1],
-                "t_comm_random_1": t_comm_avg[2],
-                "t_comm_edge_all": t_comm_avg[3],
-                "t_comm_ga": t_comm_avg[4],
-                "t_comm_dmin": t_comm_avg[5],
-                "t_comp_local_all": t_comp_avg[0],
-                "t_comp_goa": t_comp_avg[1],
-                "t_comp_random_1": t_comp_avg[2],
-                "t_comp_edge_all": t_comp_avg[3],
-                "t_comp_ga": t_comp_avg[4],
-                "t_comp_dmin": t_comp_avg[5],
-                "N_goa": n_uao_avg,
-                "N_ga": n_ga_avg,
-                "N_dmin": n_dmin_avg,
-                "N": main_args.N,
-                "t_goa": t_uao_avg,
-                "t_ga": t_ga_avg,
-            }
-        ]
-    )
+    methods = ["local_all", "goa", "random_1", "edge_all", "ga", "dmin"]
+
+    data = {}
+
+    for metric_name, values in [
+        ("accuracy", accuracy_avg),
+        ("delay_total", delay_total_avg),
+        ("delay_local", delay_local_avg),
+        ("t_comm", t_comm_avg),
+        ("t_comp", t_comp_avg),
+    ]:
+        for method, val in zip(methods, values):
+            data[f"{metric_name}_{method}"] = val
+    data["N"] = main_args.N
+    data["N_goa"] = n_uao_avg
+    data["N_ga"] = n_ga_avg
+    data["N_dmin"] = n_dmin_avg
+    data["t_goa"] = t_uao_avg
+    data["t_ga"] = t_ga_avg
+
+    df = pd.DataFrame([data])
+
     output_dir = os.path.join(os.path.dirname(__file__), "..", "result/data")
     out_fname = os.path.join(
         output_dir, f"results_N{main_args.N}_tau{main_args.tau}.csv"
