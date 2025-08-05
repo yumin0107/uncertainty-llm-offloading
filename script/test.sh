@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-Ns=(50 60 70 80 90 100)
-taus=(0.6)
+Ns=(50)
+taus=(0.6 0.7 0.8 0.9 1.0)
 
 for N in "${Ns[@]}"; do
   for tau in "${taus[@]}"; do

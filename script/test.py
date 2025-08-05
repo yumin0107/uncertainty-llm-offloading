@@ -121,7 +121,7 @@ def main():
     with open("data.json", "r") as f:
         data = json.load(f)
 
-    n_run = 10
+    n_run = 500
     b_seed = 42
     total_delay_total_list = []
     total_delay_local_list = []
@@ -129,10 +129,8 @@ def main():
     total_t_comp_list = []
     total_accuracy_list = []
     total_n_uao = 0
-    total_n_ga = 0
     total_n_dmin = 0
     total_t_uao = 0
-    total_t_ga = 0
 
     for i in range(n_run):
         data_i = data[i]
@@ -146,7 +144,6 @@ def main():
         es_rand_1 = generate_es(M)
         es_all = generate_es(M)
         es_dmin = generate_es(M)
-        es_ga = generate_es(M)
         users = generate_users(N=main_args.N, M=M, data=data_i)
 
         # ua
@@ -156,7 +153,6 @@ def main():
         )
         decisions_rand_1 = random1_offloading(users, es_rand_1, n_uao)
         decisions_all = all_offloading(users, es_all)
-        decisions_ga, n_ga, t_ga = ga_offloading(users, es_ga, main_args.tau)
         decisions_dmin, n_dmin = dmin_offloading(users, es_dmin)
 
         decision_list = [
@@ -164,10 +160,9 @@ def main():
             decisions_uao,
             decisions_rand_1,
             decisions_all,
-            decisions_ga,
             decisions_dmin,
         ]
-        es_list = [es_none, es_uao, es_rand_1, es_all, es_ga, es_dmin]
+        es_list = [es_none, es_uao, es_rand_1, es_all, es_dmin]
 
         delay_total_list = []
         delay_local_list = []
@@ -191,10 +186,8 @@ def main():
         total_t_comp_list.append(t_comp_list)
         total_accuracy_list.append(accuracy_list)
         total_n_uao += n_uao
-        total_n_ga += n_ga
         total_n_dmin += n_dmin
         total_t_uao += t_uao
-        total_t_ga += t_ga
 
     delay_total_avg = np.mean(total_delay_total_list, axis=0)
     delay_local_avg = np.mean(total_delay_local_list, axis=0)
@@ -202,12 +195,10 @@ def main():
     t_comp_avg = np.mean(total_t_comp_list, axis=0)
     accuracy_avg = np.mean(total_accuracy_list, axis=0)
     n_uao_avg = total_n_uao / n_run
-    n_ga_avg = total_n_ga / n_run
     n_dmin_avg = total_n_dmin / n_run
     t_uao_avg = total_t_uao / n_run
-    t_ga_avg = total_t_ga / n_run
 
-    methods = ["local_all", "goa", "random_1", "edge_all", "ga", "dmin"]
+    methods = ["local_all", "goa", "random_1", "edge_all", "dmin"]
 
     data = {}
 
@@ -222,10 +213,8 @@ def main():
             data[f"{metric_name}_{method}"] = val
     data["N"] = main_args.N
     data["N_goa"] = n_uao_avg
-    data["N_ga"] = n_ga_avg
     data["N_dmin"] = n_dmin_avg
     data["t_goa"] = t_uao_avg
-    data["t_ga"] = t_ga_avg
 
     df = pd.DataFrame([data])
 

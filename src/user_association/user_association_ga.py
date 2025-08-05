@@ -2,7 +2,6 @@ import time
 from typing import List, Tuple, Set
 import numpy as np
 import random
-from joblib import Parallel, delayed
 
 from basestation import User, EdgeServer
 
@@ -56,15 +55,14 @@ def fitness(ind: List[int], us: List[User], es: List[EdgeServer], tau: float) ->
     for i, j in enumerate(ind):
         user = us[i]
         if j == -1:
-            total_delta += user.uncertainty * user.t_comp_slm
+            total_delta += user.t_comp_slm
         else:
             server = es[j]
             C_j_ES = server.compute_allocation(ind.count(j))
             B_j = server.bandwidth_allocation(ind.count(j))
-            total_delta += user.uncertainty * (
-                server.edge_comp_delay(user, C_j_ES)
-                + server.total_comm_delay(user, decision, B_j)
-            )
+            total_delta += server.edge_comp_delay(
+                user, C_j_ES
+            ) + server.total_comm_delay(user, decision, B_j)
     return -total_delta  # maximize fitness = minimize delay
 
 
